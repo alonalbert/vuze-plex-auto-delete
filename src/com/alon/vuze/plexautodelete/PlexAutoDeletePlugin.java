@@ -1,4 +1,3 @@
-// Copyright 2011 Google Inc. All Rights Reserved.
 package com.alon.vuze.plexautodelete;
 
 import org.gudy.azureus2.plugins.Plugin;
@@ -14,6 +13,7 @@ import org.gudy.azureus2.plugins.download.DownloadRemovalVetoException;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.components.UITextArea;
+import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.config.IntParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
@@ -54,6 +54,8 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
 
     private IntParameter mDuration;
 
+    private BooleanParameter mEnable;
+
     public void initialize(PluginInterface pluginInterface) throws PluginException {
         mDownloadManager = pluginInterface.getDownloadManager();
         mDownloadManager.addListener(this);
@@ -69,6 +71,7 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
         final BasicPluginConfigModel configModel = pluginInterface.getUIManager()
                 .createBasicPluginConfigModel("plexautodelete");
         configModel.addLabelParameter2("config.title");
+        mEnable = configModel.addBooleanParameter2("enable", "config.enable", false);
         mServer = configModel.addStringParameter2("server", "config.server", "localhost");
         mPort = configModel.addIntParameter2("port", "config.port", 32400);
         mDuration = configModel.addIntParameter2("duration", "config.duration", 30);
@@ -76,13 +79,12 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
         mPlexRoot = configModel.addStringParameter2("plex-root", "config.plex-root", "");
         configModel.addActionParameter2(null, "config.delete_now_button").addListener(new ParameterListener() {
             public void parameterChanged(Parameter param) {
-                deleteNowClicked();
+                deleteWatchedDownloads();
             }
         });
     }
 
-    private void deleteNowClicked() {
-
+    private void deleteWatchedDownloads() {
         try {
             final PlexClient client = new PlexClient(mServer.getValue(), mPort.getValue());
             final Collection<Directory> sections = client.getShowSections();
@@ -122,8 +124,8 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
                 mLogger.log("    Is watched    : " + isWatched);
 
                 if (servedByPlex && isWatched) {
-                    mLogger.log("    Deleting");
                     if (download.getState() == Download.ST_STOPPED) {
+                        mLogger.log("    Deleting");
                         removeDownload(download);
                     } else {
                         download.addListener(new DownloadListener() {
@@ -160,7 +162,9 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
 
     private void removeDownload(Download download) {
         try {
-            download.remove(true, true);
+            if (mEnable.getValue()) {
+                download.remove(true, true);
+            }
         } catch (DownloadException e) {
             mLogger.log("Error", e);
         } catch (DownloadRemovalVetoException e) {
@@ -173,6 +177,7 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
     }
 
     public void downloadAdded(Download download) {
+        deleteWatchedDownloads();
     }
 
     public void downloadRemoved(Download download) {

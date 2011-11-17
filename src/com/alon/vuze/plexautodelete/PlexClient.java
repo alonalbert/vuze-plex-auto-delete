@@ -1,4 +1,4 @@
-package com.alon.vuze.plexautodelete;// Copyright 2011 Google Inc. All Rights Reserved.
+package com.alon.vuze.plexautodelete;
 
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
@@ -21,9 +21,6 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
-/**
- * @author aalbert@google.com (Alon Albert)
- */
 public class PlexClient {
     final private String hostname;
 
