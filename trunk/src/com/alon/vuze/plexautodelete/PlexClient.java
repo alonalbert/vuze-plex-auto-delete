@@ -46,11 +46,11 @@ public class PlexClient {
             throws IOException, SAXException, XPathExpressionException {
 
         final ArrayList<Directory> shows = getDirectories(
-                "/library/sections/" + section.getKey() + "/all");
+                "/library/sections/" + section.getKey() + "/all", null);
 
         final List<Episode> episodes = new ArrayList<Episode>();
         for (Directory show : shows) {
-            final ArrayList<Directory> seasons = getDirectories(show.getKey());
+            final ArrayList<Directory> seasons = getDirectories(show.getKey(), null);
             for (Directory season : seasons) {
                 final NodeList elements = getNodes(
                         season.getKey(), "/MediaContainer/Video");
@@ -89,12 +89,15 @@ public class PlexClient {
 
     public Collection<Directory> getShowSections()
             throws IOException, SAXException, XPathExpressionException {
-        return getDirectories("/library/sections[@type='show']");
+        return getDirectories("/library/sections", "[@type='show']");
     }
 
-    private ArrayList<Directory> getDirectories(String uri)
+    private ArrayList<Directory> getDirectories(String uri, String filter)
             throws IOException, SAXException, XPathExpressionException {
-        final NodeList elements = getNodes(uri, "/MediaContainer/Directory");
+        if (filter == null) {
+            filter = "";
+        }
+        final NodeList elements = getNodes(uri, "/MediaContainer/Directory" + filter);
 
         final ArrayList<Directory> directories = new ArrayList<Directory>();
         for (int i = 0, len = elements.getLength(); i < len; i++) {
