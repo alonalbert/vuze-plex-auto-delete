@@ -122,4 +122,9 @@ public class PlexClient {
             stream.close();
         }
       }
+
+    @Override
+    public String toString() {
+        return hostname + ":" + port;
+    }
 }

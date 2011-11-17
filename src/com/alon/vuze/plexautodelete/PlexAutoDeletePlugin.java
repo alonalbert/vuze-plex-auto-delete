@@ -19,8 +19,10 @@ import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.xml.sax.SAXException;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -56,13 +58,16 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
 
     private BooleanParameter mEnable;
 
+    private BasicPluginViewModel mViewModel;
+
     public void initialize(PluginInterface pluginInterface) throws PluginException {
         mDownloadManager = pluginInterface.getDownloadManager();
         mDownloadManager.addListener(this);
         createConfigModule(pluginInterface);
         mLogger = pluginInterface.getLogger().getTimeStampedChannel("Plex Auto Delete");
-        mLogArea = pluginInterface.getUIManager().createBasicPluginViewModel("Plex Auto Delete")
-                .getLogArea();
+        mViewModel = pluginInterface.getUIManager()
+                .createBasicPluginViewModel("Plex Auto Delete");
+        mLogArea = mViewModel.getLogArea();
         mLogger.addListener(this);
 
     }
@@ -87,36 +92,48 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
     private void deleteWatchedDownloads() {
         try {
             final PlexClient client = new PlexClient(mServer.getValue(), mPort.getValue());
+
+            mLogger.log("Fetching show sections from Plex: " + client);
+            mViewModel.getActivity().setText("Fetching sections from Plex");
             final Collection<Directory> sections = client.getShowSections();
+            mLogger.log("Found " + sections.size() + " sections");
+
             final long now = new Date().getTime();
             final Set<String> watchedFiles = new HashSet<String>();
             final Set<String> allFiles = new HashSet<String>();
+            final String plexRoot = mPlexRoot.getValue();
+            final String vuzeRoot = mVuzeRoot.getValue();
+
+            mViewModel.getActivity().setText("Fetching episodes from Plex");
             for (Directory section : sections) {
+                mLogger.log("Watched in section: " + section.getTitle());
                 final List<Episode> episodes = client.getWatchedEpisodes(section);
                 for (Episode episode : episodes) {
                     for (String file : episode.getFiles()) {
-                        final String normalizedFilename = normalizeFilename(file, mPlexRoot.getValue());
+                        final String normalizedFilename = normalizeFilename(file, plexRoot);
                         allFiles.add(normalizedFilename);
                         if (episode.getViewCount() > 0 &&  episode.getLastViewedAt() + mDuration.getValue() * DAY_MS < now) {
+                            mLogger.log("    " + normalizedFilename);
                             watchedFiles.add(normalizedFilename);
                         }
                     }
                 }
             }
-
+            mViewModel.getActivity().setText("Checking torrents");
             final Download[] downloads = mDownloadManager.getDownloads();
             for (Download download : downloads) {
                 mLogger.log("Checking " + download.getTorrentFileName());
                 boolean isWatched = false;
                 boolean servedByPlex = false;
                 for (DiskManagerFileInfo info : download.getDiskManagerFileInfo()) {
-                    final String file = normalizeFilename(info.getFile().getPath(), mVuzeRoot.getValue());
+                    final String file = normalizeFilename(info.getFile().getPath(), vuzeRoot);
                     if (allFiles.contains(file)) {
                         servedByPlex = true;
                         if (!watchedFiles.contains(file)) {
                             isWatched = false;
                             break;
                         }
+                        watchedFiles.remove(file);
                         isWatched = true;
                     }
                 }
@@ -149,6 +166,17 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
                     }
                 }
             }
+            mViewModel.getActivity().setText("Checking orphans");
+            if (!watchedFiles.isEmpty()) {
+                mLogger.log("Deleting orphans");
+                for (String filename : watchedFiles) {
+                    final File file = new File(vuzeRoot, filename);
+                    mLogger.log("    " + file);
+                    if (mEnable.getValue()) {
+                        file.delete();
+                    }
+                }
+            }
         } catch (ParserConfigurationException e) {
             mLogger.log("Error", e);
         } catch (SAXException e) {
@@ -157,6 +185,8 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
             mLogger.log("Error", e);
         } catch (IOException e) {
             mLogger.log("Error", e);
+        } finally {
+            mViewModel.getActivity().setText("Idle");
         }
     }
 
