@@ -1,4 +1,3 @@
-// Copyright 2011 Google Inc. All Rights Reserved.
 package com.alon.vuze.plexautodelete;
 
 import java.util.Collections;

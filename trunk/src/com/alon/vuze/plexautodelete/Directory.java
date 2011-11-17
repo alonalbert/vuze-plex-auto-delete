@@ -1,8 +1,5 @@
-package com.alon.vuze.plexautodelete;// Copyright 2011 Google Inc. All Rights Reserved.
+package com.alon.vuze.plexautodelete;
 
-/**
- * @author aalbert@google.com (Alon Albert)
- */
 public class Directory {
     private final String title;
     private final String type;
