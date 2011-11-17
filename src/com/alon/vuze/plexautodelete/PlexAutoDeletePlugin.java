@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
@@ -118,13 +119,24 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
                 mLogger.log("Watched in section: " + section.getTitle());
                 final List<Episode> episodes = client.getWatchedEpisodes(section);
                 for (Episode episode : episodes) {
+                    final ArrayList<String> normalizedFiles = new ArrayList<String>();
                     for (String file : episode.getFiles()) {
-                        final String normalizedFilename = normalizeFilename(file, plexRoot);
-                        allFiles.add(normalizedFilename);
-                        if (episode.getViewCount() > 0 &&  episode.getLastViewedAt() + mDuration.getValue() * DAY_MS < now) {
-                            mLogger.log("    " + normalizedFilename);
-                            watchedFiles.add(normalizedFilename);
+                        normalizedFiles.add(normalizeFilename(file, plexRoot));
+                    }
+                    allFiles.addAll(normalizedFiles);
+                    if (episode.getViewCount() > 0) {
+                        final long lastViewedAt = episode.getLastViewedAt();
+                        if (lastViewedAt + mDuration.getValue() * DAY_MS < now) {
+                            mLogger.log("    Watched on : " + new Date(lastViewedAt) + ". Marking as watched");
+                            watchedFiles.addAll(normalizedFiles);
+                        } else {
+                            mLogger.log("    Watched on : " + new Date(lastViewedAt) + ". Marking as unwatched");
                         }
+                    } else {
+                        mLogger.log("    Unwatched");
+                    }
+                    for (String file : normalizedFiles) {
+                        mLogger.log("        " + file);
                     }
                 }
             }
