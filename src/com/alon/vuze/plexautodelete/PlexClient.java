@@ -89,7 +89,7 @@ public class PlexClient {
 
     public Collection<Directory> getShowSections()
             throws IOException, SAXException, XPathExpressionException {
-        return getDirectories("/library/sections");
+        return getDirectories("/library/sections[@type='show']");
     }
 
     private ArrayList<Directory> getDirectories(String uri)

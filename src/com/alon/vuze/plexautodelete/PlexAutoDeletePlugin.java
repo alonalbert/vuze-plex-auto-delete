@@ -31,6 +31,8 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
@@ -60,16 +62,16 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
 
     private BasicPluginViewModel mViewModel;
 
+    private Timer mTimer = new Timer(true);
+
     public void initialize(PluginInterface pluginInterface) throws PluginException {
         mDownloadManager = pluginInterface.getDownloadManager();
-        mDownloadManager.addListener(this);
         createConfigModule(pluginInterface);
         mLogger = pluginInterface.getLogger().getTimeStampedChannel("Plex Auto Delete");
         mViewModel = pluginInterface.getUIManager()
                 .createBasicPluginViewModel("Plex Auto Delete");
         mLogArea = mViewModel.getLogArea();
         mLogger.addListener(this);
-
     }
 
     private void createConfigModule(PluginInterface pluginInterface) {
@@ -87,6 +89,13 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
                 deleteWatchedDownloads();
             }
         });
+
+        mTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        deleteWatchedDownloads();
+                    }
+                }, 0, DAY_MS);
     }
 
     private void deleteWatchedDownloads() {
