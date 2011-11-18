@@ -30,10 +30,6 @@ public class PlexClient {
 
     final private XPath xPath;
 
-    public PlexClient(String hostname) throws ParserConfigurationException {
-        this(hostname, 32400);
-    }
-
     public PlexClient(String hostname, int port) throws ParserConfigurationException {
         this.hostname = hostname;
         this.port = port;
@@ -42,7 +38,7 @@ public class PlexClient {
         xPath = XPathFactory.newInstance().newXPath();
     }
 
-    public List<Episode> getWatchedEpisodes(Directory section)
+    public List<Episode> getEpisodes(Directory section)
             throws IOException, SAXException, XPathExpressionException {
 
         final ArrayList<Directory> shows = getDirectories(
@@ -57,7 +53,6 @@ public class PlexClient {
                 for (int iElement = 0, numElements = elements.getLength(); iElement < numElements; iElement++) {
                     final Element element = (Element) elements.item(iElement);
                     final String key = element.getAttribute("key");
-                    final Document document = getDocument(key);
                     final NodeList attributes = (NodeList) xPath.evaluate("Media/Part/@file", element, XPathConstants.NODESET);
                     final List<String> files = new ArrayList<String>();
                     for (int iAttribute = 0, numAttibutes = attributes.getLength(); iAttribute < numAttibutes; iAttribute++) {
@@ -69,10 +64,11 @@ public class PlexClient {
                     final long lastViewedAt;
                     if (element.hasAttribute("viewCount")) {
                         viewCount = Integer.parseInt(element.getAttribute("viewCount"));
-                        final Element deepElement = (Element) xPath.evaluate(
-                                "/MediaContainer/Video", document, XPathConstants.NODE);
-                        final String s = deepElement.getAttribute("lastViewedAt");
-                        lastViewedAt = Long.parseLong(s) * 1000;
+                        if (viewCount > 0) {
+                            lastViewedAt = getLastViewedAt(key);
+                        } else {
+                            lastViewedAt = Long.MAX_VALUE;
+                        }
                     } else {
                         viewCount = 0;
                         lastViewedAt = Long.MAX_VALUE;
@@ -85,6 +81,20 @@ public class PlexClient {
         }
 
         return episodes;
+    }
+
+    private long getLastViewedAt(String key) throws IOException, SAXException, XPathExpressionException {
+        Document document = getDocument(key);
+        Element element = (Element) xPath.evaluate("/MediaContainer/Video", document, XPathConstants.NODE);
+        if (!element.hasAttribute("lastViewedAt")) {
+            document = getDocument(key);
+            element = (Element) xPath.evaluate("/MediaContainer/Video", document, XPathConstants.NODE);
+        }
+        try {
+            return Long.parseLong(element.getAttribute("lastViewedAt")) * 1000;
+        } catch (NumberFormatException e) {
+            return Long.MAX_VALUE;
+        }
     }
 
     public Collection<Directory> getShowSections()
