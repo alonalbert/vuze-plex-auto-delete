@@ -1,5 +1,6 @@
 package com.alon.vuze.plexautodelete;
 
+import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.plugins.Plugin;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -20,6 +21,7 @@ import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
+import org.gudy.azureus2.plugins.utils.Utilities;
 import org.xml.sax.SAXException;
 
 import java.io.File;
@@ -27,14 +29,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
@@ -65,6 +60,7 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
     private BasicPluginViewModel mViewModel;
 
     private Timer mTimer = new Timer(true);
+    private Utilities mUtilities;
 
     public void initialize(PluginInterface pluginInterface) throws PluginException {
         mDownloadManager = pluginInterface.getDownloadManager();
@@ -72,8 +68,10 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
         mLogger = pluginInterface.getLogger().getTimeStampedChannel("Plex Auto Delete");
         mViewModel = pluginInterface.getUIManager()
                 .createBasicPluginViewModel("Plex Auto Delete");
+        pluginInterface.getUIManager().attachUI();
         mLogArea = mViewModel.getLogArea();
         mLogger.addListener(this);
+        mUtilities = pluginInterface.getUtilities();
     }
 
     private void createConfigModule(PluginInterface pluginInterface) {
@@ -140,16 +138,23 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
                 return;
             }
 
+            Collections.sort(watchedEpisodes, new Comparator<Episode>() {
+                public int compare(Episode o1, Episode o2) {
+                    long v1 = o1.getLastViewedAt();
+                    long v2 = o2.getLastViewedAt();
+                    return v1 < v2 ? -1 : v1 == v2 ? 0 : 1;
+                }
+            });
             mLogger.log(String.format("%d watched episodes found", watchedEpisodes.size()));
-            mLogger.log(String.format("    %10s  %8s   %s", "Watched on", "Delete", "Filename"));
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             for (Episode episode : watchedEpisodes) {
                 for (String file : episode.getFiles()) {
                     long lastViewedAt = episode.getLastViewedAt();
-                    mLogger.log(String.format("    %10s  %8s   %s",
-                            dateFormat.format(new Date(lastViewedAt)),
-                            lastViewedAt < cutoff ? "YES" : "NO",
-                            file));
+                    if (lastViewedAt < cutoff) {
+                        mLogger.log(String.format("    %10s   %s",
+                                dateFormat.format(new Date(lastViewedAt)),
+                                file));
+                    }
                 }
             }
 
@@ -173,10 +178,11 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
         if (!filesToDelete.isEmpty()) {
             mLogger.log("Deleting orphans");
             for (String filename : filesToDelete) {
-                final File file = new File(vuzeRoot, filename);
+                final File file = new File(vuzeRoot + filename);
                 mLogger.log("    Deleting " + file);
                 if (mEnable.getValue()) {
-                    file.delete();
+                    boolean deleted = file.delete();
+                    mLogger.log("    Deleted: " + deleted);
                 }
             }
         }
@@ -245,7 +251,11 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
     }
 
     public void downloadAdded(Download download) {
-        deleteWatchedDownloads();
+        mUtilities.createDelayedTask(new Runnable() {
+            public void run() {
+                deleteWatchedDownloads();
+            }
+        });
     }
 
     public void downloadRemoved(Download download) {
