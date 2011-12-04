@@ -1,6 +1,5 @@
 package com.alon.vuze.plexautodelete;
 
-import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.plugins.Plugin;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -49,6 +48,8 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
 
     private DownloadManager mDownloadManager;
 
+    private StringParameter mSections;
+
     private StringParameter mVuzeRoot;
 
     private StringParameter mPlexRoot;
@@ -58,7 +59,6 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
     private BooleanParameter mEnable;
 
     private BasicPluginViewModel mViewModel;
-
     private Timer mTimer = new Timer(true);
     private Utilities mUtilities;
 
@@ -68,7 +68,6 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
         mLogger = pluginInterface.getLogger().getTimeStampedChannel("Plex Auto Delete");
         mViewModel = pluginInterface.getUIManager()
                 .createBasicPluginViewModel("Plex Auto Delete");
-        pluginInterface.getUIManager().attachUI();
         mLogArea = mViewModel.getLogArea();
         mLogger.addListener(this);
         mUtilities = pluginInterface.getUtilities();
@@ -81,6 +80,7 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
         mEnable = configModel.addBooleanParameter2("enable", "config.enable", false);
         mServer = configModel.addStringParameter2("server", "config.server", "localhost");
         mPort = configModel.addIntParameter2("port", "config.port", 32400);
+        mSections = configModel.addStringParameter2("sections", "config.sections", "");
         mDuration = configModel.addIntParameter2("duration", "config.duration", 30);
         mVuzeRoot = configModel.addStringParameter2("vuze-root", "config.vuze-root", "");
         mPlexRoot = configModel.addStringParameter2("plex-root", "config.plex-root", "");
@@ -104,6 +104,9 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
 
             mLogger.log("Fetching show sections from Plex: " + client);
             mViewModel.getActivity().setText("Fetching sections from Plex");
+            final String mSectionsValue = mSections.getValue();
+            final HashSet<String> sectionNames =
+                    mSectionsValue.length() == 0 ? null :  Sets.newHashSet(mSectionsValue.split(","));
             final Collection<Directory> sections = client.getShowSections();
             mLogger.log("Found " + sections.size() + " sections");
 
@@ -116,19 +119,22 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
             mViewModel.getActivity().setText("Fetching episodes from Plex");
             final List<Episode> watchedEpisodes = new ArrayList<Episode>();
             for (Directory section : sections) {
-                final List<Episode> episodes = client.getEpisodes(section);
-                for (Episode episode : episodes) {
-                    final ArrayList<String> normalizedFiles = new ArrayList<String>();
-                    for (String file : episode.getFiles()) {
-                        normalizedFiles.add(normalizeFilename(file, plexRoot));
-                    }
-                    allFiles.addAll(normalizedFiles);
-                    if (episode.getViewCount() > 0) {
-                        watchedEpisodes.add(episode);
-                        final long lastViewedAt = episode.getLastViewedAt();
-                        if (lastViewedAt  < cutoff) {
-                            filesToDelete.addAll(normalizedFiles);
-                        } else {
+                if (sectionNames == null || sectionNames.contains(section.getTitle())) {
+                    mLogger.log("Checking section " + section.getTitle());
+                    final List<Episode> episodes = client.getEpisodes(section);
+                    for (Episode episode : episodes) {
+                        final ArrayList<String> normalizedFiles = new ArrayList<String>();
+                        for (String file : episode.getFiles()) {
+                            normalizedFiles.add(normalizeFilename(file, plexRoot));
+                        }
+                        allFiles.addAll(normalizedFiles);
+                        if (episode.getViewCount() > 0) {
+                            watchedEpisodes.add(episode);
+                            final long lastViewedAt = episode.getLastViewedAt();
+                            if (lastViewedAt  < cutoff) {
+                                filesToDelete.addAll(normalizedFiles);
+                            } else {
+                            }
                         }
                     }
                 }
