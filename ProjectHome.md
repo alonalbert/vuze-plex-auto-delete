@@ -1,0 +1,1 @@
+This plugin auto-deletes torrents that contain files that are served by a Plex server and have been watched.
