@@ -8,7 +8,6 @@ import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadException;
 import org.gudy.azureus2.plugins.download.DownloadListener;
 import org.gudy.azureus2.plugins.download.DownloadManager;
-import org.gudy.azureus2.plugins.download.DownloadManagerListener;
 import org.gudy.azureus2.plugins.download.DownloadRemovalVetoException;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
@@ -18,7 +17,6 @@ import org.gudy.azureus2.plugins.ui.config.IntParameter;
 import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
-import org.gudy.azureus2.plugins.utils.Utilities;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -38,8 +36,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
-public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
-        LoggerChannelListener {
+public class PlexAutoDeletePlugin implements Plugin, LoggerChannelListener {
 
   private static final long DAY_MS = TimeUnit.DAYS.toMillis(1);
   private static final int LOG_DAYS = 30;
@@ -66,31 +63,29 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
 
   private BasicPluginViewModel viewModel;
   private Timer timer = new Timer(true);
-  private Utilities utilities;
 
   public void initialize(PluginInterface pluginInterface) throws PluginException {
     downloadManager = pluginInterface.getDownloadManager();
-    createConfigModule(pluginInterface);
     logger = pluginInterface.getLogger().getTimeStampedChannel("Plex Auto Delete");
+    createConfigModule(pluginInterface);
     viewModel = pluginInterface.getUIManager()
             .createBasicPluginViewModel("Plex Auto Delete");
     logArea = viewModel.getLogArea();
     logger.addListener(this);
-    utilities = pluginInterface.getUtilities();
   }
 
   private void createConfigModule(PluginInterface pluginInterface) {
     final BasicPluginConfigModel configModel = pluginInterface.getUIManager()
             .createBasicPluginConfigModel("plexautodelete");
-    configModel.addLabelParameter2("config.title");
-    enable = configModel.addBooleanParameter2("enable", "config.enable", false);
-    server = configModel.addStringParameter2("server", "config.server", "localhost");
-    port = configModel.addStringParameter2("port", "config.port", "32400");
-    sections = configModel.addStringParameter2("sections", "config.sections", "");
-    duration = configModel.addIntParameter2("duration", "config.duration", 30);
-    vuzeRoot = configModel.addStringParameter2("vuze-root", "config.vuze-root", "");
-    plexRoot = configModel.addStringParameter2("plex-root", "config.plex-root", "");
-    configModel.addActionParameter2(null, "config.delete_now_button")
+    configModel.addLabelParameter2("plexautodelete.title");
+    enable = configModel.addBooleanParameter2("enable", "plexautodelete.enable", false);
+    server = configModel.addStringParameter2("server", "plexautodelete.server", "localhost");
+    port = configModel.addStringParameter2("port", "plexautodelete.port", "32400");
+    sections = configModel.addStringParameter2("sections", "plexautodelete.sections", "");
+    duration = configModel.addIntParameter2("duration", "plexautodelete.duration", 30);
+    vuzeRoot = configModel.addStringParameter2("vuze-root", "plexautodelete.vuze-root", "");
+    plexRoot = configModel.addStringParameter2("plex-root", "plexautodelete.plex-root", "");
+    configModel.addActionParameter2(null, "plexautodelete.delete_now_button")
         .addListener(param -> timer.schedule(new TimerTask() {
           @Override
           public void run() {
@@ -104,16 +99,6 @@ public class PlexAutoDeletePlugin implements Plugin, DownloadManagerListener,
         deleteWatchedDownloads();
       }
     }, 0, DAY_MS);
-  }
-
-  @Override
-  public void downloadAdded(Download download) {
-    utilities.createDelayedTask(this::deleteWatchedDownloads);
-  }
-
-  @Override
-  public void downloadRemoved(Download download) {
-    // nop
   }
 
   @Override
